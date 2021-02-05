@@ -93,7 +93,7 @@ class CommentDefaultFormatterCacheTagsTest extends EntityKernelTestBase {
       'config:user.settings',
     ];
     sort($expected_cache_tags);
-    $this->assertEqual($build['#cache']['tags'], $expected_cache_tags);
+    $this->assertEqual($expected_cache_tags, $build['#cache']['tags']);
 
     // Create a comment on that entity. Comment loading requires that the uid
     // also exists in the {users} table.
@@ -141,7 +141,7 @@ class CommentDefaultFormatterCacheTagsTest extends EntityKernelTestBase {
       'config:user.settings',
     ];
     sort($expected_cache_tags);
-    $this->assertEqual($build['#cache']['tags'], $expected_cache_tags);
+    $this->assertEqual($expected_cache_tags, $build['#cache']['tags']);
 
     // Build a render array with the entity in a sub-element so that lazy
     // builder elements bubble up outside of the entity and we can check that
@@ -154,8 +154,8 @@ class CommentDefaultFormatterCacheTagsTest extends EntityKernelTestBase {
 
     // The entity itself was cached but the top-level element is max-age 0 due
     // to the bubbled up max age due to the lazy-built comment form.
-    $this->assertIdentical(Cache::PERMANENT, $build['entity']['#cache']['max-age']);
-    $this->assertIdentical(0, $build['#cache']['max-age'], 'Top level render array has max-age 0');
+    $this->assertSame(Cache::PERMANENT, $build['entity']['#cache']['max-age']);
+    $this->assertSame(0, $build['#cache']['max-age'], 'Top level render array has max-age 0');
 
     // The children (fields) of the entity render array are only built in case
     // of a cache miss.

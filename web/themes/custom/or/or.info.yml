@@ -1,0 +1,20 @@
+name: OpenReporter
+type: theme
+description: 'OpenReporter subtheme based on Bootstrap 4 theme.'
+core: 8.x
+core_version_requirement: '^8 || ^9'
+'base theme': bootstrap5
+stylesheets-remove:
+  - '@bootstrap5/css/style.css'
+libraries:
+  - or/global-styling
+regions:
+  header: Header
+  nav_branding: 'Navigation branding region'
+  nav_main: 'Main navigation region'
+  nav_additional: 'Additional navigation region (eg search form, social icons, etc)'
+  breadcrumb: Breadcrumbs
+  content: 'Main content'
+  sidebar_first: 'Sidebar first'
+  sidebar_second: 'Sidebar second'
+  footer: Footer

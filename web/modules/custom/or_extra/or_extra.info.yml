@@ -1,0 +1,5 @@
+name: OR Extra
+description: 'Custom Module for "Glue" Code'
+type: module
+core_version_requirement: ^8.8 || ^9
+package: OpenReporter

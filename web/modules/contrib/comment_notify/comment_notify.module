@@ -1,0 +1,612 @@
+<?php
+
+/**
+ * @file
+ * This module provides comment follow-up e-mail notifications.
+ *
+ * It works for anonymous and registered users.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\comment\CommentInterface;
+use Drupal\comment_notify\Form\CommentNotifySettings;
+use Drupal\Component\Render\PlainTextOutput;
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Url;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\user\Entity\User;
+use Drupal\Core\Routing\RouteMatchInterface;
+
+define('COMMENT_NOTIFY_DISABLED', 0);
+define('COMMENT_NOTIFY_ENTITY', 1);
+define('COMMENT_NOTIFY_COMMENT', 2);
+
+/**
+ * Provide an array of available options for notification on a comment.
+ */
+function _comment_notify_options() {
+  $total_options = [
+    COMMENT_NOTIFY_ENTITY => t('All comments'),
+    COMMENT_NOTIFY_COMMENT => t('Replies to my comment'),
+  ];
+
+  $selected_options = array_filter(\Drupal::config('comment_notify.settings')->get('available_alerts'));
+  $available_options = array_intersect_key($total_options, $selected_options);
+
+  return $available_options;
+}
+
+/**
+ * Add the comment_notify fields in the comment form.
+ */
+function comment_notify_form_comment_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $user = \Drupal::currentUser();
+  if (!($user->hasPermission('subscribe to comments') || $user->hasPermission('administer comments'))) {
+    return;
+  }
+
+  /** @var \Drupal\Core\Entity\EntityInterface $comment_entity */
+  $comment_entity = $form_state->getFormObject()->getEntity();
+  $field_identifier = CommentNotifySettings::getCommentFieldIdentifier($comment_entity);
+
+  // Only add the checkbox if this is an enabled content type.
+  $enabled_types = \Drupal::config('comment_notify.settings')->get('bundle_types');
+  if (!in_array($field_identifier, $enabled_types)) {
+    return;
+  }
+
+  $available_options = _comment_notify_options();
+  // Add the checkbox for anonymous users.
+  if ($user->isAnonymous()) {
+    // If anonymous users can't enter their e-mail don't tempt them with the
+    // checkbox.
+    if (empty($form['author']['mail'])) {
+      return;
+    }
+    $form['#validate'][] = 'comment_notify_comment_validate';
+  }
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+  /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+  $user_settings = \Drupal::service('comment_notify.user_settings');
+  $preference = $user_settings->getSetting($user->id(), 'comment_notify');
+  // If you want to hide this on your site see http://drupal.org/node/322482
+  $form['comment_notify_settings'] = [
+    '#attached' => ['library' => ['comment_notify/comment_notify']],
+  ];
+  $form['comment_notify_settings']['notify'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Notify me when new comments are posted'),
+    '#default_value' => (bool) $preference,
+  ];
+
+  $form['comment_notify_settings']['notify_type'] = [
+    '#type' => 'radios',
+    '#options' => $available_options,
+    '#default_value' => $preference != "none" ? $preference : 1,
+  ];
+  if (count($available_options) == 1) {
+    $form['comment_notify_settings']['notify_type']['#type'] = 'hidden';
+    $form['comment_notify_settings']['notify_type']['#value'] = key($available_options);
+  }
+
+  // If this is an existing comment we set the default value based on their
+  // selection last time.
+  /** @var \Drupal\comment\CommentInterface $comment */
+  $comment = $form_state->getFormObject()->getEntity();
+  if (!$comment->isNew()) {
+    $notify = comment_notify_get_notification_type($comment->id());
+    $form['comment_notify_settings']['notify']['#default_value'] = (bool) $notify;
+    if (count($available_options) > 1) {
+      $form['comment_notify_settings']['notify_type']['#default_value'] = empty($notify) ? COMMENT_NOTIFY_ENTITY : $notify;
+    }
+    else {
+      $form['comment_notify_settings']['notify_type']['#default_value'] = key($available_options);
+    }
+  }
+
+  $form['actions']['submit']['#submit'][] = '_comment_notify_submit_comment_form';
+}
+
+/**
+ * Checks if the values used in the comment_notify fields are valid.
+ */
+function comment_notify_comment_validate(&$form, FormStateInterface $form_state) {
+  $user = \Drupal::currentUser();
+  // We assume that if they are non-anonymous then they have a valid mail.
+  // For anonymous users, though, we verify that they entered a mail and let
+  // comment.module validate it is real.
+  if ($user->isAnonymous() && $form['comment_notify_settings']['notify']['#value'] && empty($form['author']['mail']['#value'])) {
+    $form_state->setErrorByName('mail', t('If you want to subscribe to comments you must supply a valid e-mail address.'));
+  }
+}
+
+/**
+ * Sends the mail alerts if necessary.
+ */
+function comment_notify_comment_publish($comment) {
+  // And send notifications - the real purpose of the module.
+  _comment_notify_mailalert($comment);
+}
+
+/**
+ * Additional submit handler for the comment form.
+ */
+function _comment_notify_submit_comment_form(array &$form, FormStateInterface $form_state) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+
+  /** @var \Drupal\comment\CommentInterface $comment */
+  $comment = $form_state->getFormObject()->getEntity();
+  $user = \Drupal::currentUser();
+  /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+  $user_settings = \Drupal::service('comment_notify.user_settings');
+
+  // If the form component is visible, these values should be in the form state.
+  // Otherwise, use the user's preferences.
+  if ($form_state->hasValue('notify') && $form_state->hasValue('notify_type')) {
+    $status = $form_state->getValue('notify') ? $form_state->getValue('notify_type') : COMMENT_NOTIFY_DISABLED;
+    // Update user's preference.
+    // @todo are the user notifications allowed to be edited here?
+    if (!$user->isAnonymous()) {
+      /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+      $user_settings->saveSettings($user->id(), NULL, $status);
+    }
+  }
+  else {
+    $status = $user_settings->getSetting($user->id(), 'comment_notify');
+  }
+
+  // Save notification settings.
+  if (comment_notify_get_notification_type($comment->id())) {
+    // Update existing record.
+    comment_notify_update_notification($comment->id(), $status);
+  }
+  else {
+    // For new comments, we first build up a string to be used as the identifier
+    // for the alert. This identifier is used to later unsubscribe the user or
+    // allow them to potentially edit their comment / preferences if they are
+    // anonymous. The string is built with token and their host and comment
+    // identifier. It is stored and referenced, we really just need something
+    // unique/unguessable. See comment_notify_unsubscribe_by_hash().
+    // @todo make the comment_notify_add_notification() generate the hash.
+    $hostname = !$comment->getHostname() ? $comment->getHostname() : (isset($user->hostname) ? $user->hostname : '');
+    $notify_hash = \Drupal::csrfToken()->get($hostname . $comment->id());
+    comment_notify_add_notification($comment->id(), $status, $notify_hash, $comment->notified);
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update() for comment.
+ */
+function comment_notify_comment_update(CommentInterface $comment) {
+  // And send notifications - the real purpose of the module.
+  if ($comment->isPublished()) {
+    _comment_notify_mailalert($comment);
+  }
+}
+
+/**
+ * Implements hook_comment_insert().
+ */
+function comment_notify_comment_insert(CommentInterface $comment) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+
+  // And send notifications - the real purpose of the module.
+  if ($comment->isPublished()) {
+    _comment_notify_mailalert($comment);
+  }
+}
+
+/**
+ * Deletes all the notifications when a comment is deleted.
+ */
+function comment_notify_comment_delete(CommentInterface $comment) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+  comment_notify_remove_all_notifications($comment->id());
+}
+
+/**
+ * Returns array of comment notify enabled entity type & bundles.
+ */
+function _comment_notify_get_comment_enabled_bundles() {
+  $field_manager = \Drupal::service('entity_field.manager');
+  $bundles_with_comment_fields = [];
+  $comment_field_map = $field_manager->getFieldMapByFieldType('comment');
+  foreach ($comment_field_map as $entity_type => $comment_fields) {
+    foreach ($comment_fields as $field_name => $field_info) {
+      foreach ($field_info['bundles'] as $field_bundle) {
+        $bundles_with_comment_fields[$entity_type] = $field_bundle;
+      }
+    }
+  }
+  return $bundles_with_comment_fields;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function comment_notify_form_user_form_alter(&$form, FormStateInterface &$form_state, $form_id) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+
+  /** @var \Drupal\user\UserInterface $user */
+  $user = $form_state->getFormObject()->getEntity();
+  /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+  $user_settings = \Drupal::service('comment_notify.user_settings');
+  $notify_settings = $user->id() && $user_settings->getSettings($user->id()) ? $user_settings->getSettings($user->id()) : $user_settings->getDefaultSettings();
+
+  // Only show the entity followup UI if the user has permission to create
+  // entities.
+  $bundles = FALSE;
+  foreach (_comment_notify_get_comment_enabled_bundles() as $entity_type => $bundle) {
+    if (\Drupal::entityTypeManager()->getAccessControlHandler($entity_type)->createAccess($bundle)) {
+      $bundles = TRUE;
+      break;
+    }
+  }
+
+  // If the user cannot create nodes nor has the 'subscribe to comments'
+  // permission then there is no need to alter the user_form.
+  if ((!\Drupal::currentUser()->hasPermission('administer nodes') && $bundles === FALSE) && ($user->hasPermission('subscribe to comments') === FALSE)) {
+    return;
+  }
+
+  $form['comment_notify_settings'] = [
+    '#type' => 'details',
+    '#title' => t('Comment follow-up notification settings'),
+    '#weight' => 4,
+    '#open' => TRUE,
+  ];
+
+  if (\Drupal::currentUser()->hasPermission('administer nodes') || $bundles) {
+    $form['comment_notify_settings']['entity_notify'] = [
+      '#type' => 'checkbox',
+      '#title' => t('Receive content follow-up notification e-mails'),
+      '#default_value' => isset($notify_settings['entity_notify']) ? $notify_settings['entity_notify'] : NULL,
+      '#description' => t('Check this box to receive e-mail notifications for comments on your <strong>content</strong> (e.g. an article authored by you). You cannot disable notifications for individual threads.'),
+    ];
+  }
+  else {
+    $form['comment_notify_settings']['entity_notify'] = [
+      '#type' => 'hidden',
+      '#value' => COMMENT_NOTIFY_DISABLED,
+    ];
+  }
+
+  if ($user->hasPermission('subscribe to comments')) {
+    $available_options[COMMENT_NOTIFY_DISABLED] = t('No notifications');
+    $available_options += _comment_notify_options();
+    $form['comment_notify_settings']['comment_notify'] = [
+      '#type' => 'select',
+      '#title' => t('Receive comment follow-up notification e-mails'),
+      '#default_value' => isset($notify_settings['comment_notify']) ? $notify_settings['comment_notify'] : NULL,
+      '#options' => $available_options,
+      '#description' => t("Choose whether, by default, to subscribe to e-mail notifications for replies to your own <strong>comments</strong>. Your site administrator may have customised the options available. You can change this setting on a per-comment basis, and later unsubscribe from individual posts."),
+    ];
+  }
+  else {
+    $form['comment_notify_settings']['comment_notify'] = [
+      '#type' => 'hidden',
+      '#value' => COMMENT_NOTIFY_DISABLED,
+    ];
+  }
+  $form['actions']['submit']['#submit'][] = '_comment_notify_submit_user_form';
+}
+
+/**
+ * Additional submit handler for the user form.
+ */
+function _comment_notify_submit_user_form(array &$form, FormStateInterface $form_state) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+
+  /** @var \Drupal\user\UserInterface $user */
+  $user = $form_state->getFormObject()->getEntity();
+
+  if (!$user->isAnonymous() && is_numeric($form_state->getValue('entity_notify')) && is_numeric($form_state->getValue('comment_notify'))) {
+    /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+    $user_settings = \Drupal::service('comment_notify.user_settings');
+    $user_settings->saveSettings($user->id(), $form_state->getValue('entity_notify'), $form_state->getValue('comment_notify'));
+  }
+}
+
+/**
+ * Implements hook_user_delete().
+ */
+function comment_notify_user_predelete(EntityInterface $entity) {
+  // This hook is invoked when the account is deleted.
+  comment_notify_remove_user_settings($entity->id());
+}
+
+/**
+ * Implements hook_user_cancel().
+ */
+function comment_notify_user_cancel($edit, $account, $method) {
+  // This hook is invoked when the account is disabled.
+  comment_notify_remove_user_settings($account->id());
+}
+
+/**
+ * Remove the user settings of of the user with the given $uid.
+ *
+ * @param int $uid
+ *   The user id.
+ */
+function comment_notify_remove_user_settings($uid) {
+  /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+  $user_settings = \Drupal::service('comment_notify.user_settings');
+  $user_settings->deleteSettings($uid);
+}
+
+/**
+ * Implements hook_comment_load().
+ */
+function comment_notify_comment_load($comments) {
+  // Load some comment_notify specific information into the comment object.
+  $query = \Drupal::database()->select('comment_notify', 'cn');
+  $query->join('comment_field_data', 'c', 'c.cid = cn.cid');
+  $query->leftJoin('users_field_data', 'u', 'c.uid = u.uid');
+  $query->condition('c.cid', array_keys($comments), 'IN');
+  $query->fields('cn', ['cid', 'notify', 'notify_hash', 'notified']);
+  $query->addField('c', 'mail', 'cmail');
+  $query->addField('u', 'init', 'uinit');
+  $query->addField('u', 'mail', 'umail');
+
+  $records = $query->execute()->fetchAllAssoc('cid');
+  foreach ($records as $cid => $record) {
+    $comments[$cid]->notify = $record->notify;
+    $comments[$cid]->notify_type = $record->notify;
+    $comments[$cid]->notify_hash = $record->notify_hash;
+    $comments[$cid]->notified = $record->notified;
+    $comments[$cid]->cmail = $record->cmail;
+    $comments[$cid]->uinit = $record->uinit;
+    $comments[$cid]->umail = $record->umail;
+  }
+}
+
+/**
+ * Private function to send the notifications.
+ *
+ * @param \Drupal\comment\CommentInterface $comment
+ *   The comment entity.
+ */
+function _comment_notify_mailalert(CommentInterface $comment) {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+
+  $config = \Drupal::config('comment_notify.settings');
+  $user = \Drupal::currentUser();
+
+  $entity_id = $comment->getCommentedEntityId();
+  $entity_type = $comment->getCommentedEntityTypeId();
+  $field_identifier = CommentNotifySettings::getCommentFieldIdentifier($comment);
+
+  $comment_type = $comment->get('comment_type')->getString();
+
+  // Check to see if a notification has already been sent for this
+  // comment so that edits to a comment don't trigger an additional
+  // notification.
+  if (!empty($comment->notified)) {
+    return;
+  }
+
+  /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
+  $entity = \Drupal::entityTypeManager()->getStorage($entity_type)->load($entity_id);
+
+  // No mails if this is not an enabled content type.
+  $enabled_types = $config->get('bundle_types');
+  if (!empty($enabled_types) && !in_array($field_identifier, $enabled_types)) {
+    return;
+  }
+
+  if (empty($comment->getAuthorEmail())) {
+    /** @var \Drupal\user\UserInterface $comment_account */
+    if ($comment_account = user_load_by_name($comment->getAuthorName())) {
+      $comment_mail = $comment_account->getEmail() ?: '';
+    }
+    else {
+      $comment_mail = '';
+    }
+  }
+  else {
+    $comment_mail = $comment->getAuthorEmail();
+  }
+  $sent_to = [];
+
+  // @todo Add hook to allow entity types to specify their type's author field?
+  $author_fields = ['uid', 'user_id'];
+  foreach ($author_fields as $author_field) {
+    // Send to a subscribed author if they are not the current commenter.
+    if ($entity->hasField($author_field)) {
+      // If the entity is a user object, then the user object is the "author'.
+      if ($entity instanceof User) {
+        $author = $entity;
+      }
+      // For now assume every other entity has an "owner".
+      else {
+        $author = $entity->getOwner();
+      }
+      /** @var \Drupal\comment_notify\UserNotificationSettings $user_settings */
+      $user_settings = \Drupal::service('comment_notify.user_settings');
+      $author_notify_settings = $user_settings->getSettings($author->id()) ?: $user_settings->getDefaultSettings();
+      $author_email = $author->getEmail();
+
+      // Do they explicitly want this? Or is it default to send to users? Is
+      // the comment author not the entity author? Do they have access? Do they
+      // have an email (e.g. anonymous)?
+      $entity_notify_a = !empty($author_notify_settings['entity_notify']) && $author_notify_settings['entity_notify'] == 1;
+      $entity_notify_b = $config->get('enable_default.entity_author') == 1 && !isset($author_notify_settings['entity_notify']);
+      if (!empty($author_email)
+        && ($entity_notify_a || $entity_notify_b)
+        && $user->id() != $author->id()
+        && $entity->access('view', $author)
+      ) {
+        if (in_array($author_email, $sent_to)) {
+          continue;
+        }
+        $raw_values = $config->get('mail_templates.entity_author.' . $entity->getEntityTypeId());
+        $token_data = [
+          'comment' => $comment,
+          'user' => $author,
+        ];
+        if ($entity_type == 'node') {
+          $token_data['node'] = $entity;
+        }
+        $message['subject'] = PlainTextOutput::renderFromHtml(\Drupal::token()->replace($raw_values['subject'], $token_data));
+        $message['body'] = \Drupal::token()->replace($raw_values['body'], $token_data);
+
+        $language = $author->getPreferredLangcode();
+        \Drupal::service('plugin.manager.mail')->mail('comment_notify', 'comment_notify_mail', $author->getEmail(), $language, $message);
+        $sent_to[] = strtolower($author->getEmail());
+      }
+      // This field existed, so there's no need to try again.
+      break;
+    }
+  }
+
+  // For "reply to my comments" notifications, figure out what thread this is.
+  $thread = $comment->getThread() ?: '';
+
+  // Get the list of commenters to notify.
+  $watchers = comment_notify_get_watchers($entity_id, $comment_type);
+
+  foreach ($watchers as $alert) {
+    // If the user is not anonymous, always load the current e-mail address
+    // from his or her user account instead of trusting $comment->mail.
+    $recipient_user = $alert->getOwner();
+    $mail = !empty($recipient_user->getEmail()) ? $recipient_user->getEmail() : $alert->getAuthorEmail();
+    // Trim the trailing / off the thread, if present.
+    $alert_thread = rtrim((string) $alert->getThread(), '/');
+
+    $relevant_thread = mb_substr($thread, 0, mb_strlen($alert_thread));
+    if ($alert->notify == COMMENT_NOTIFY_COMMENT && strcmp($relevant_thread, $alert_thread) != 0) {
+      continue;
+    }
+
+    if ($mail != $comment_mail && !in_array(strtolower($mail), $sent_to) && ($alert->getOwnerId() != $comment->getOwnerId() || $alert->getOwnerId() == 0)) {
+      $message = [];
+
+      // Make sure they have access to this entity before showing a bunch of
+      // entity information.
+      if (!$entity->access('view', $recipient_user)) {
+        continue;
+      }
+
+      $raw_values = $config->get('mail_templates.watcher.' . $entity->getEntityTypeId());
+      $token_data = [
+        'comment' => $comment,
+        'comment-subscribed' => $alert,
+      ];
+      if ($entity_type == 'node') {
+        $token_data['node'] = $entity;
+      }
+      $message['subject'] = PlainTextOutput::renderFromHtml(\Drupal::token()->replace($raw_values['subject'], $token_data));
+      $message['body'] = \Drupal::token()->replace($raw_values['body'], $token_data);
+
+      $language = !empty($alert->uid) ? $recipient_user->getPreferredLangcode() : LanguageInterface::LANGCODE_DEFAULT;
+      \Drupal::service('plugin.manager.mail')
+        ->mail('comment_notify', 'comment_notify_mail', $mail, $language, $message);
+      $sent_to[] = strtolower($mail);
+
+      // Make the mail link to user's /edit, unless it's an anonymous user.
+      if ($alert->getOwnerId() != 0) {
+        $user_mail = $alert->toLink($mail, 'edit-form')->toString();
+      }
+      else {
+        $user_mail = Html::escape($mail);
+      }
+
+      // Add an entry to the watchdog log.
+      $args = [
+        '@user_mail' => $user_mail,
+        'link' => $alert->toLink(t('source comment'))->toString(),
+      ];
+      \Drupal::logger('comment_notify')
+        ->notice('Notified: @user_mail', $args);
+    }
+  }
+  // Record that a notification was sent for this comment so that
+  // notifications aren't sent again if the comment is later edited.
+  comment_notify_mark_comment_as_notified($comment);
+}
+
+/**
+ * Implements hook_mail().
+ */
+function comment_notify_mail($key, &$message, $params) {
+  $message['subject'] = $params['subject'];
+  $message['body'][] = $params['body'];
+}
+
+/**
+ * Get the unsubscribe link for a comment subscriber.
+ *
+ * @param \Drupal\comment\CommentInterface $comment
+ *   The subscribed comment object.
+ *
+ * @return string|null
+ *   An absolute URL string for the unsubscribe page, or NULL if the comment is
+ *   missing a notification hash.
+ *
+ * @todo In what case would a comment be missing its notification hash?
+ */
+function comment_notify_get_unsubscribe_url(CommentInterface $comment) {
+  if (!empty($comment->notify_hash)) {
+    return Url::fromRoute('comment_notify.disable', [
+      'hash' => $comment->notify_hash,
+    ])->setAbsolute()
+      ->toString();
+  }
+  return NULL;
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function comment_notify_entity_extra_field_info() {
+  module_load_include('inc', 'comment_notify', 'comment_notify');
+  $extras = [];
+  $config = \Drupal::config('comment_notify.settings');
+
+  foreach ($config->get('bundle_types') as $bundle_type) {
+    $field_identifier = explode('--', $bundle_type);
+    $comment_field = FieldConfig::loadByName($field_identifier[0], $field_identifier[1], $field_identifier[2]);
+    if ($comment_field) {
+      $bundle_info = \Drupal::service("entity_type.bundle.info")->getBundleInfo($field_identifier[0]);
+      $bundle_label = $bundle_info[$field_identifier[1]]['label'];
+      $comment_type = $comment_field->getSetting('comment_type');
+      $extras['comment'][$comment_type]['form']['comment_notify_settings'] = [
+        'label' => t('Comment Notify settings'),
+        'description' => t('@bundle_type settings for Comment Notify', ['@bundle_type' => $bundle_label]),
+        'weight' => 1,
+      ];
+    }
+  }
+
+  $extras['user']['user']['form']['comment_notify_settings'] = [
+    'label' => t('Comment Notify settings'),
+    'description' => t('User settings for Comment Notify'),
+    'weight' => 4,
+  ];
+  return $extras;
+}
+
+/**
+ * Implements hook_help().
+ */
+function comment_notify_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.comment_notify':
+      $text = file_get_contents(dirname(__FILE__) . '/README.md');
+      if (!\Drupal::moduleHandler()->moduleExists('markdown')) {
+        return '<pre>' . $text . '</pre>';
+      }
+      else {
+        // Use the Markdown filter to render the README.
+        $filter_manager = \Drupal::service('plugin.manager.filter');
+        $settings = \Drupal::configFactory()->get('markdown.settings')->getRawData();
+        $config = ['settings' => $settings];
+        $filter = $filter_manager->createInstance('markdown', $config);
+        return $filter->process($text, 'en');
+      }
+  }
+  return NULL;
+}

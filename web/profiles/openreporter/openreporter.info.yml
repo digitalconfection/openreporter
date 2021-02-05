@@ -1,0 +1,7 @@
+name: OpenReporter
+type: profile
+description: 'Profile for OpenReporter'
+core_version_requirement: '^8 || ^9'
+
+distribution:
+  name: OpenReporter

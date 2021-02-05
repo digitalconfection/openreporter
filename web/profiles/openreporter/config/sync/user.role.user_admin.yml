@@ -1,0 +1,39 @@
+uuid: 03773784-9b25-4b7b-8bff-1423f8aeb97a
+langcode: en
+status: true
+dependencies: {  }
+id: user_admin
+label: 'User Admin'
+weight: 3
+is_admin: null
+permissions:
+  - 'access comments'
+  - 'access content'
+  - 'access content overview'
+  - 'access taxonomy overview'
+  - 'access toolbar'
+  - 'access user profiles'
+  - 'administer comment types'
+  - 'administer comments'
+  - 'administer nodes'
+  - 'administer taxonomy'
+  - 'administer users'
+  - 'bypass node access'
+  - 'cancel account'
+  - 'change own username'
+  - 'create article content'
+  - 'create terms in tags'
+  - 'delete any article content'
+  - 'delete article revisions'
+  - 'delete own article content'
+  - 'delete terms in tags'
+  - 'edit any article content'
+  - 'edit own article content'
+  - 'edit own comments'
+  - 'edit terms in tags'
+  - 'post comments'
+  - 'revert article revisions'
+  - 'skip comment approval'
+  - 'view article revisions'
+  - 'view own unpublished content'
+  - 'view the administration theme'

@@ -1,0 +1,9 @@
+comment_notify:
+  version: 1.x
+  css:
+    theme:
+      comment_notify.css: {}
+  js:
+    comment_notify.js: {}
+  dependencies:
+    - core/jquery

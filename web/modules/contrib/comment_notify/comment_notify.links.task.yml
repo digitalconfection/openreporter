@@ -1,0 +1,9 @@
+comment_notify.settings:
+  route_name: comment_notify.settings
+  title: Settings
+  base_route: comment_notify.settings
+comment_notify.unsubscribe:
+  route_name: comment_notify.unsubscribe
+  title: Unsubscribe
+  weight: 2
+  base_route: comment_notify.settings

@@ -1,0 +1,55 @@
+bundle_types:
+  - node--article--comment
+available_alerts:
+  1: true
+  2: true
+enable_default:
+  watcher: none
+  entity_author: false
+mail_templates:
+  watcher:
+    node:
+      subject: '[site:name] :: new comment on [node:title]'
+      body: |
+        Hi [comment-subscribed:author],
+
+        [comment:author] has commented on: "[node:title]"
+
+        ----
+        [comment:title]
+        [comment:body]
+        ----
+
+        You can view the comment at the following url
+        [comment:url]
+
+        You can stop receiving emails when someone replies to this post,
+        by going to [comment-subscribed:unsubscribe-url]
+
+        You can set up auto-following feature for all future posts
+        by creating your own user with a few clicks here [site:login-url]
+
+        -- [site:name] team
+        [site:url]
+  entity_author:
+    node:
+      subject: '[site:name] :: new comment for your post'
+      body: |
+        Hi [node:author],
+
+        You have received a comment on: "[node:title]"
+
+        ----
+        [comment:title]
+        [comment:body]
+        ----
+
+        You can view the comment at the following url
+        [comment:url]
+
+        You will receive emails like this for all replies to your posts. You can
+        disable this by logging in and changing the settings on your user account at
+        [node:author:edit-url].
+
+        -- [site:name] team
+        [site:url]

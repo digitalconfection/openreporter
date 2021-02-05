@@ -1,0 +1,6 @@
+'administer comment notify':
+  title: 'Administer Comment Notify'
+  description: 'Change global comment notification settings.'
+'subscribe to comments':
+  title: 'Subscribe to comment notifications'
+  description: 'Subscribe to recieve notifications when new comments are posted.'

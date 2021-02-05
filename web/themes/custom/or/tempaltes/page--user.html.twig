@@ -1,0 +1,21 @@
+{% if not logged_in %}
+<div class="login_well">
+  <div class="row">
+    <div class="col">
+      <a href="{{url('<front>')}}" class="login_logo"></a>
+        <div class="login_reg-link"><a href="{{url('<front>')}}user">Login</a> | <a href="{{url('<front>')}}user/register">Register</a></div>
+    </div>
+  </div>
+  {{page.content}}
+</div>
+{% else %}
+
+  {{page.content}}
+  {{ drupal_view('user_content', 'block_1') }}
+
+  <div id="modal" class="modal card">
+    <div class="card_header"><div id="close_card" onclick="closeCard();">X</div></div>
+    <iframe name="user_content_frame" width="100%" height="100%"></iframe>
+  </div>
+
+{% endif %}

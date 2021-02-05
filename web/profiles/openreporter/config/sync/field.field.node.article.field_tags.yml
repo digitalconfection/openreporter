@@ -1,0 +1,35 @@
+uuid: fea33d63-319c-4974-af91-883da0dfb3a6
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_tags
+    - node.type.article
+    - taxonomy.vocabulary.tags
+  content:
+    - 'taxonomy_term:tags:206084e2-38f0-469f-be93-d5436ab61a93'
+_core:
+  default_config_hash: QdUgf_beeoaPiyKorFv0q1fcJpWH_uZTqe_xoVJacrw
+id: node.article.field_tags
+field_name: field_tags
+entity_type: node
+bundle: article
+label: Tags
+description: ''
+required: true
+translatable: true
+default_value:
+  -
+    target_uuid: 206084e2-38f0-469f-be93-d5436ab61a93
+default_value_callback: ''
+settings:
+  handler: 'default:taxonomy_term'
+  handler_settings:
+    target_bundles:
+      tags: tags
+    sort:
+      field: _none
+      direction: asc
+    auto_create: false
+    auto_create_bundle: ''
+field_type: entity_reference

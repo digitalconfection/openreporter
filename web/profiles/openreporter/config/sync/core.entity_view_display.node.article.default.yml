@@ -1,0 +1,151 @@
+uuid: f40785e3-bf43-4684-bd42-25f9dc0c7303
+langcode: en
+status: true
+dependencies:
+  config:
+    - core.entity_view_display.comment.comment.default
+    - field.field.node.article.comment
+    - field.field.node.article.field_body
+    - field.field.node.article.field_image
+    - field.field.node.article.field_location
+    - field.field.node.article.field_tags
+    - image.style.large
+    - node.type.article
+  module:
+    - comment
+    - geofield_map
+    - image
+    - user
+_core:
+  default_config_hash: ChmU3AVqDKU32A_fyChG0W9dTRKmVBR58B6OClCLvZI
+id: node.article.default
+targetEntityType: node
+bundle: article
+mode: default
+content:
+  comment:
+    type: comment_default
+    weight: 4
+    region: content
+    label: hidden
+    settings:
+      view_mode: default
+      pager_id: 0
+    third_party_settings: {  }
+  field_body:
+    weight: 2
+    label: hidden
+    settings: {  }
+    third_party_settings: {  }
+    type: basic_string
+    region: content
+  field_image:
+    type: image
+    weight: 1
+    region: content
+    settings:
+      image_style: large
+      image_link: ''
+    third_party_settings: {  }
+    label: hidden
+  field_location:
+    weight: 0
+    label: hidden
+    settings:
+      map_dimensions:
+        width: 100%
+        height: 450px
+      map_empty:
+        empty_behaviour: '0'
+        empty_message: 'No Geofield Value entered for this field'
+      map_center:
+        center_force: '1'
+        lat: '42'
+        lon: '12.5'
+        geocode: 'Find my location'
+      map_zoom_and_pan:
+        zoom:
+          initial: '6'
+          min: '1'
+          max: '22'
+          finer: '0'
+          force: 0
+        gestureHandling: auto
+        scrollwheel: '1'
+        draggable: '1'
+        map_reset_position: TOP_RIGHT
+        map_reset: 0
+      map_controls:
+        zoom_control: '1'
+        map_type_id: roadmap
+        map_type_control: '1'
+        map_type_control_options_type_ids:
+          roadmap: roadmap
+          satellite: satellite
+          hybrid: hybrid
+          terrain: terrain
+        scale_control: '1'
+        disable_default_ui: 0
+        street_view_control: 0
+        fullscreen_control: 0
+      map_marker_and_infowindow:
+        icon_image_mode: icon_file
+        icon_file_wrapper:
+          icon_file:
+            fids: ''
+            upload_button: Upload
+            remove_button: Remove
+            upload: ''
+            is_svg: false
+          image_style: geofield_map_default_icon_style
+        icon_image_path: ''
+        infowindow_field: title
+        view_mode: full
+        tooltip_field: title
+        multivalue_split: 0
+        force_open: 0
+      map_additional_options: ''
+      map_geometries_options: '{"strokeColor":"black","strokeOpacity":"0.8","strokeWeight":2,"fillColor":"blue","fillOpacity":"0.1","clickable":false}'
+      map_oms:
+        map_oms_control: '1'
+        map_oms_options: '{"markersWontMove":"true","markersWontHide":"true","basicFormatEvents":"true","nearbyDistance":3}'
+      custom_style_map:
+        custom_style_name: ''
+        custom_style_options: ''
+        custom_style_control: 0
+        custom_style_default: 0
+      map_markercluster:
+        markercluster_additional_options: '{"maxZoom":12,"gridSize":50}'
+        markercluster_control: 0
+      map_additional_libraries:
+        places: 0
+        drawing: 0
+        geometry: 0
+        visualization: 0
+      map_lazy_load:
+        lazy_load: 0
+      gmap_api_key: ''
+      map_geocoder:
+        control: 0
+        settings:
+          position: topright
+          input_size: 25
+          providers: {  }
+          min_terms: 4
+          delay: 800
+          zoom: 16
+          infowindow: 0
+          options: ''
+    third_party_settings: {  }
+    type: geofield_google_map
+    region: content
+  field_tags:
+    type: entity_reference_label
+    weight: 3
+    region: content
+    label: inline
+    settings:
+      link: false
+    third_party_settings: {  }
+hidden:
+  links: true

@@ -1,0 +1,195 @@
+<?php
+
+/**
+ * @file
+ * Comment_notify.install.
+ */
+
+use Drupal\Core\Database\Database;
+use Drupal\Core\Site\Settings;
+
+/**
+ * Implements hook_install().
+ */
+function comment_notify_install() {
+  $database = \Drupal::database();
+  // Create entries for existing comments.
+  $comments_select = $database->select('comment_field_data', 'c');
+  $comments_select->join('users_field_data', 'u', 'c.uid = u.uid');
+  $comments_select->addField('c', 'cid');
+  $comments_select->addExpression('0', 'notify');
+  // Mix in a random string to all values.
+  $salt = uniqid(mt_rand(), TRUE);
+  if ($database->driver() == 'pgsql') {
+    $comments_select->addExpression("MD5(:salt || c.mail || COALESCE(u.mail, u.init) || c.uid || c.name || c.entity_id || c.hostname || c.cid)", 'notify_hash', [':salt' => $salt]);
+  }
+  else {
+    $comments_select->addExpression("MD5(CONCAT_WS('', :salt, c.mail, COALESCE(u.mail, u.init), c.uid, c.name, c.entity_id, c.hostname, c.cid))", 'notify_hash', [':salt' => $salt]);
+  }
+  $database->insert('comment_notify')->from($comments_select)->execute();
+
+  // Set module weight low so that other modules act on the comment first.
+  module_set_weight('comment_notify', 10);
+}
+
+/**
+ * Implements hook_schema().
+ */
+function comment_notify_schema() {
+  $schema['comment_notify'] = [
+    'description' => 'Stores information about which commenters on the site have subscriped to followup emails.',
+    'fields' => [
+      'cid' => [
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'description' => 'The comment id from {comments}.cid',
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ],
+      'notify' => [
+        'type' => 'int',
+        'description' => 'An integer indicating the type of subscription: 0 means not subscribed, 1 means subscribed to all comments, and 2 means only subscribed to replies of this comment.',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'disp-width' => '11',
+      ],
+      'notify_hash' => [
+        'type' => 'varchar',
+        'description' => 'A hash of unique information about the commenter.  Used for unsubscribing users.',
+        'length' => '128',
+        'not null' => TRUE,
+        'default' => '',
+      ],
+      'notified' => [
+        'type' => 'int',
+        'description' => 'A boolean indicator for whether or not a notification for the comment has been sent: 1 means yes, 0 means no.',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '11',
+      ],
+    ],
+    'primary key' => ['cid'],
+    'indexes' => [
+      'notify_hash' => ['notify_hash'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implementations of hook_update().
+ */
+
+/**
+ * Rename db column name from node_notify to entity_notify.
+ */
+function comment_notify_update_8001() {
+  $spec = [
+    'type' => 'int',
+    'description' => 'An integer indicating the default type of subscription: 0 means not subscribed, 1 means subscribed to all comments, and 2 means only subscribed to replies of this comment.',
+    'size' => 'tiny',
+    'not null' => TRUE,
+    'default' => 0,
+    'disp-width' => '11',
+  ];
+  Database::getConnection()->schema()->changeField('comment_notify_user_settings', 'node_notify', 'entity_notify', $spec);
+}
+
+/**
+ * Preserve node notification settings.
+ */
+function comment_notify_update_8002() {
+  $node_values = \Drupal::config('comment_notify.settings')->get('node_types');
+  $bundle_types = [];
+  $field_manager = \Drupal::service('entity_field.manager');
+  $bundles_with_comment_fields = [];
+  $comment_field_map = $field_manager->getFieldMapByFieldType('comment');
+  foreach ($comment_field_map as $entity_type => $comment_fields) {
+    foreach ($comment_fields as $field_name => $field_info) {
+      foreach ($field_info['bundles'] as $field_bundle) {
+        $bundles_with_comment_fields[$field_bundle][] = $field_name;
+      }
+    }
+  }
+  foreach ($bundles_with_comment_fields as $bundle => $fields) {
+    if (!in_array($bundle, $node_values)) {
+      continue;
+    }
+    foreach ($fields as $field_name) {
+      $bundle_types[] = 'node--' . $bundle . '--' . $field_name;
+    }
+  }
+  \Drupal::configFactory()
+    ->getEditable('comment_notify.settings')
+    ->set('bundle_types', $bundle_types)
+    ->save();
+}
+
+/**
+ * Update settings for generic entity support.
+ */
+function comment_notify_update_8003() {
+  /** @var \Drupal\Core\Config\Config $config */
+  $config = \Drupal::service('config.factory')
+    ->getEditable('comment_notify.settings');
+
+  // Update the email settings.
+  $vars = [
+    'mail_templates.watcher.subject' => 'mail_templates.watcher.node.subject',
+    'mail_templates.watcher.body' => 'mail_templates.watcher.node.body',
+    'mail_templates.entity_author.subject' => 'mail_templates.entity_author.node.subject',
+    'mail_templates.entity_author.body' => 'mail_templates.entity_author.node.body',
+  ];
+
+  // Update the settings.
+  foreach ($vars as $old => $new) {
+    $value = $config->get($old);
+    $config->set($new, $value);
+    $config->clear($old);
+  }
+
+  $config->save();
+}
+
+/**
+ * Migrate the users preferences to the Drupal's users_data table.
+ */
+function comment_notify_update_8004(&$sandbox) {
+  $database = \Drupal::database();
+  $user_data = \Drupal::service('user.data');
+
+  if (!isset($sandbox['current'])) {
+    // Set batch ops sandbox.
+    $sandbox['current'] = 0;
+    $sandbox['limit'] = Settings::get('entity_update_batch_size', 50);
+
+    $select = $database->select('comment_notify_user_settings', 'c');
+    $sandbox['max'] = $select
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+  }
+
+  $select = $database->select('comment_notify_user_settings', 'c');
+  $settings = $select
+    ->fields('c', ['uid', 'entity_notify', 'comment_notify'])
+    ->range($sandbox['current'], $sandbox['limit'])
+    ->orderBy('uid', 'ASC')
+    ->execute()
+    ->fetchAll();
+
+  foreach ($settings as $row) {
+    $user_data->set('comment_notify', $row->uid, 'entity_notify', $row->entity_notify);
+    $user_data->set('comment_notify', $row->uid, 'comment_notify', $row->comment_notify);
+    $sandbox['current']++;
+  }
+  $sandbox['#finished'] = empty($sandbox['max']) ? 1 : ($sandbox['current'] / $sandbox['max']);
+
+  if ($sandbox['#finished'] >= 1) {
+    // Delete the old comment_notify_user_settings table.
+    $database->schema()->dropTable('comment_notify_user_settings');
+    return t('The comment notify user settings has been migrated to the user data table.');
+  }
+}

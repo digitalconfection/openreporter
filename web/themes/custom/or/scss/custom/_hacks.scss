@@ -1,0 +1,61 @@
+// This file is of the temp style hacks for MVP.
+// Comments Hacks
+
+.comment-form__title {
+  display: none;
+}
+
+
+// .comment {
+
+//   h3,
+//   .comment-reply {
+//     display: none;
+//   }
+
+//   ul {
+//     font-size: small;
+//   }
+
+//   .inline li {
+//     padding-left: 0;
+//   }
+
+//   .comment__meta {
+//     padding: 0;
+//     text-align: left;
+
+//     .comment__submitted {
+//       margin: unset;
+//     }
+  
+//     a {
+//       display: none;
+//     }
+//   }
+
+// }
+
+// .comment-form__title {
+//   display: none;
+// }
+
+.page-node-type-article,
+.path-comment {
+
+  margin: unset !important;
+  
+  .alert,
+  .node__meta,
+  #toolbar-bar,
+  #edit-preview {
+    display: none;
+  }
+
+}
+
+// Node edit hack
+.vertical-tabs,
+.js-form-item-field-location-0-value-map-geocode {
+  display: none;
+}

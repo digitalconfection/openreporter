@@ -1,0 +1,30 @@
+<?php
+
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Core\Url;
+
+/**
+ * Implements hook_user_login().
+ */
+function or_extra_user_login($account) {
+
+  $current_user_roles = \Drupal::currentUser()->getRoles();
+  $user = \Drupal\user\Entity\User::load(\Drupal::currentUser()->id());
+  $current_route = \Drupal::routeMatch()->getRouteName();
+
+  if (!in_array($current_route, ['user.reset', 'user.reset.login'])) {
+    
+    // If user is user_admin or user #1 redirect to panel. Otherwise redirect to user page.
+    if (in_array('user_admin', $current_user_roles) Xor \Drupal::currentUser()->id() == '1') {
+      $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
+      $response->send();
+    }
+  }
+
+}
+
+function or_extra_preprocess_user_profile(&$variables) { 
+
+  $variables['content_list'] = views_embed_view('user_content', 'block_1');
+
+}

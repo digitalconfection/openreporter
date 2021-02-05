@@ -1,0 +1,11 @@
+name: OR Content
+description: 'Default content for OpenReporter'
+type: module
+core_version_requirement: ^8.8 || ^9
+package: OpenReporter
+
+default_content:
+  taxonomy_term: 
+    - 0c0c5cb0-dc21-4c36-bd8b-56c94bb16697
+    - 09bd2257-3e71-4077-910d-6d0bd80735a4
+    - 206084e2-38f0-469f-be93-d5436ab61a93

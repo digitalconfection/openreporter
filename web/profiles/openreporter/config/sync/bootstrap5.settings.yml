@@ -1,0 +1,22 @@
+b5_body_schema: none
+b5_body_bg_schema: none
+b5_navbar_schema: light
+b5_navbar_bg_schema: none
+b5_footer_schema: none
+b5_footer_bg_schema: none
+b5_top_container: 'container-fluid m-0 p-0'
+subtheme_folder: themes/custom
+subtheme_name: ''
+subtheme_machine_name: ''
+_core:
+  default_config_hash: CAWaLYDuYZhd0E4Pb0aiitxNS3zPieBhKhghtt32G_M
+features:
+  node_user_picture: 1
+  comment_user_picture: 1
+  comment_user_verification: 1
+  favicon: 1
+logo:
+  use_default: 0
+  path: 'public://logo3.png'
+favicon:
+  use_default: 1

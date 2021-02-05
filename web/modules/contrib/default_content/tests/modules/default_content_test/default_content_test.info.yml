@@ -1,0 +1,13 @@
+name: 'Default content tests'
+type: module
+hidden: TRUE
+description: 'Default content tests'
+package: Web services
+core_version_requirement: ^8.7.7 || ^9
+dependencies:
+  - default_content:default_content
+
+# Information added by Drupal.org packaging script on 2020-07-18
+version: '2.0.0-alpha1'
+project: 'default_content'
+datestamp: 1595072291

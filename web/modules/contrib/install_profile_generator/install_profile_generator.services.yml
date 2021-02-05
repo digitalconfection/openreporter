@@ -1,0 +1,7 @@
+services:
+  install_profile_generator.profile_factory:
+    class: Drupal\install_profile_generator\Services\ProfileFactory
+    arguments: ['@app.root', '@file_system', '@config.factory']
+  install_profile_generator.validator:
+    class: Drupal\install_profile_generator\Services\Validator
+    arguments: ['@app.root', '@module_handler', '@theme_handler', '@transliteration', '%install_profile%', '@extension.list.module']

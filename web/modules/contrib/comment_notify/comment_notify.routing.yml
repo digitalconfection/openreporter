@@ -1,0 +1,23 @@
+comment_notify.settings:
+  path: /admin/config/people/comment_notify
+  defaults:
+    _title: Comment notification
+    _form: \Drupal\comment_notify\Form\CommentNotifySettings
+  requirements:
+    _permission: 'administer comment notify'
+
+comment_notify.unsubscribe:
+  path: /admin/config/people/comment_notify/unsubscribe
+  defaults:
+    _title: Unsubscribe from comment notifications
+    _form: \Drupal\comment_notify\Form\CommentNotifyUnsubscribe
+  requirements:
+    _permission: 'administer comment notify'
+
+comment_notify.disable:
+  path: '/comment_notify/disable/{hash}'
+  defaults:
+    _title: 'Disable comment notification'
+    _controller: '\Drupal\comment_notify\Controller\CommentNotifyController::disable'
+  requirements:
+    _permission: 'access content'

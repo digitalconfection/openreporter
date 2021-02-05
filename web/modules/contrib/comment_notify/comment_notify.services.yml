@@ -1,0 +1,4 @@
+services:
+  comment_notify.user_settings:
+    class: Drupal\comment_notify\UserNotificationSettings
+    arguments: ['@user.data', '@config.factory']

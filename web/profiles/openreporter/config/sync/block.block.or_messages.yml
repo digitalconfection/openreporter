@@ -1,0 +1,22 @@
+uuid: eba44705-9689-4513-9b9c-d45cfe3d4d4d
+langcode: en
+status: true
+dependencies:
+  module:
+    - system
+  theme:
+    - or
+_core:
+  default_config_hash: 9LdMj38y4GDi23GrIUtIZIV1bJEn1C47N19jrswvcLc
+id: or_messages
+theme: or
+region: content
+weight: -7
+provider: null
+plugin: system_messages_block
+settings:
+  id: system_messages_block
+  label: Messages
+  provider: system
+  label_display: '0'
+visibility: {  }

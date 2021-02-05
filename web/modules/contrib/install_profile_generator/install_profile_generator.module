@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Contains install_profile_generator.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function install_profile_generator_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the install_profile_generator module.
+    case 'help.page.install_profile_generator':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Provides a drush command to create an install profile from a site&#039;s current configuration') . '</p>';
+      return $output;
+
+    default:
+  }
+}

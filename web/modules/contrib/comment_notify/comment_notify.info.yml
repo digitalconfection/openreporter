@@ -1,0 +1,14 @@
+name: 'Comment Notify'
+description: 'Comment follow-up e-mail notification for anonymous as well as registered users.'
+configure: comment_notify.settings
+dependencies:
+  - drupal:comment
+  - token:token
+core: 8.x
+type: module
+core_version_requirement: ^8 || ^9
+
+# Information added by Drupal.org packaging script on 2020-05-21
+version: '8.x-1.2'
+project: 'comment_notify'
+datestamp: 1590085538

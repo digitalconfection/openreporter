@@ -1,0 +1,10 @@
+{
+    "name": "drupal/install_profile_generator",
+    "description": "Provides a drush command to create an install profile from a site's current configuration",
+    "type": "drupal-module",
+    "require": {
+        "drush/drush": "^9 || ^10"
+    },
+    "license": "GPL-2.0-or-later",
+    "minimum-stability": "dev"
+}

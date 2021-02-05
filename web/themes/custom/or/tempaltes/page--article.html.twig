@@ -1,0 +1,10 @@
+{# Not ideal but dont have time for an event subscriber. #}
+{% if 'page__node__edit' not in theme_hook_suggestions %}
+<script>
+  if( top === self ) { // not in a frame
+    location.href = "{{url('<front>')}}"; // either the frameset or an error.
+  }
+</script>
+{% endif %}
+
+{{ page.content }}

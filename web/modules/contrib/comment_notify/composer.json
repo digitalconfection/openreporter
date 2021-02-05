@@ -1,0 +1,29 @@
+{
+    "name": "drupal/comment_notify",
+    "description": "Comment follow-up e-mail notification for anonymous as well as registered users.",
+    "type": "drupal-module",
+    "homepage": "https://drupal.org/project/comment_notify",
+    "authors": [
+        {
+            "name": "Greg Knaddison (greggles)",
+            "homepage": "https://www.drupal.org/u/greggles",
+            "role": "Maintainer"
+        },
+        {
+            "name": "David Valdez (gnuget)",
+            "homepage": "https://www.drupal.org/u/gnuget",
+            "role": "Co-maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://drupal.org/project/issues/comment_notify",
+        "irc": "irc://irc.freenode.org/drupal-contribute",
+        "source": "https://git.drupalcode.org/project/comment_notify"
+    },
+    "license": "GPL-2.0-or-later",
+    "minimum-stability": "dev",
+    "require": {
+        "drupal/core": "^8 || ^9",
+        "drupal/token": "^1.6"
+    }
+}

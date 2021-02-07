@@ -17,12 +17,12 @@ OpenReporter is an open-source app that helps organizations mobilize their commu
 - Navigate to your domain and follow the onscreen installation process.
 
 ## After installation:
-- Login with the admin user and navigate admin/configuration and add your Google API Key.
-- Go to admin/site-setting to change any user configuration and site name, and site email.
-- Update message changes
+- Login with the admin user and navigate to `admin/config/system/geofield_map_settings` and add your Google API Key.
+- Go to `admin/config/system/site-information` to change any site configurations name and email.
+- Go to `admin/config/people/accounts` to change any welcome message text.
 
 ## Updating and saving configuration:
-When new updates are released to ensure that your site configuration is not overwritten, go to the drupal /admin and export your site config as tar.gz. After updating, re-import your config. Revert the items that you have changed and accept the incoming imports. 
+When new updates are released to ensure that your site configuration is not overwritten, go to `admin/config/development/configuration` and export your site config as tar.gz. After updating, re-import your config. Revert the items that you have changed and accept the incoming imports. 
 
 # Support
 Running into an issue? Open an [Issue](https://github.com/digitalconfection/openreporter/issues) or reach out to us on [Twitter](https://twitter.com/openreporter).
